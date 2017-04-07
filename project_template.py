@@ -35,11 +35,11 @@ dataset = read_csv(filename, delim_whitespace=True, names=names)
 # 2. Summarize Data
 # a) Descriptive statistics
 #shape
-#print(dataset.shape)
+print(dataset.shape)
 #types
-#print(dataset.dtypes)
+print(dataset.dtypes)
 #head
-#print(dataset.head(20))
+print(dataset.head(20))
 set_option('precision', 1)
 print(dataset.describe())
 #correlation
@@ -48,19 +48,19 @@ print(dataset.corr(method='pearson'))
 
 # b) Data visualizations
 #histograms
-#dataset.hist(sharex=False, sharey=False, xlabelsize=1, ylabelsize=1)
-#pyplot.show()
+dataset.hist(sharex=False, sharey=False, xlabelsize=1, ylabelsize=1)
+pyplot.show()
 
 #density
-#dataset.plot(kind='density', subplots=True, layout=(4,4), sharex=False, legend=False, fontsize=1)
-#pyplot.show()
+dataset.plot(kind='density', subplots=True, layout=(4,4), sharex=False, legend=False, fontsize=1)
+pyplot.show()
 
-#dataset.plot(kind='box', subplots=True, layout=(4,4), sharex=False, sharey=False, fontsize=8)
-#pyplot.show()
+dataset.plot(kind='box', subplots=True, layout=(4,4), sharex=False, sharey=False, fontsize=8)
+pyplot.show()
 
 #scatter plot matrix
-#scatter_matrix(dataset)
-#pyplot.show()
+scatter_matrix(dataset)
+pyplot.show()
 
 #correlation matrix
 fig = pyplot.figure()
@@ -72,9 +72,7 @@ ax.set_xticks(ticks)
 ax.set_yticks(ticks)
 ax.set_xticklabels(names)
 ax.set_yticklabels(names)
-#pyplot.show()
-
-
+pyplot.show()
 
 # 3. Prepare Data
 # a) Data Cleaning
@@ -176,12 +174,44 @@ for name, model in ensembles:
 	results.append(cv_results)
 	names.append(name)
 	msg = "%s: %f (%f)" % (name, cv_results.mean(), cv_results.std())
-	
 	print(msg)
+
+#Compare Algorithms
+fig = pyplot.figure()
+fig.suptitle('Scaled Ensemble Algorithm Comparison')
+ax = fig.add_subplot(111)
+pyplot.boxplot(results)
+ax.set_xticklabels(names)
+pyplot.show()
+
+#Tune scaled GBM
+scaler = StandardScaler().fit(X_train)
+rescaledX = scaler.transform(X_train)
+param_grid = dict(n_estimators=numpy.array([50, 100, 150, 200, 250, 300, 350, 400]))
+model = GradientBoostingRegressor(random_state=seed)
+kfold = KFold(n_splits = num_folds, random_state=seed)
+grid = GridSearchCV(estimator=model, param_grid=param_grid, scoring=scoring, cv=kfold)
+grid_result = grid.fit(rescaledX, Y_train)
+
+print("Best: %f using %s" % (grid_result.best_score_, grid_result.best_params_))
+means = grid_result.cv_results_['mean_test_score']
+stds = grid_result.cv_results_['std_test_score']
+params = grid_result.cv_results_['params']
+for mean, stdev, param in zip(means, stds, params):
+	print("%f (%f) with: %r" % (mean, stdev, param))
 
 
 # 6. Finalize Model
+#prepare the model
+scaler = StandardScaler().fit(X_train)
+rescaledX = scaler.transform(X_train)
+model = GradientBoostingRegressor(random_state=seed, n_estimators=400)
+model.fit(rescaledX, Y_train)
 # a) Predictions on validation dataset
+# transform the validation dataset
+rescaledValidationX = scaler.transform(X_validation)
+predictions = model.predict(rescaledValidationX)
+print(mean_squared_error(Y_validation, predictions))
 # b) Create standalone model on entire training dataset
 # c) Save model for later use
 
